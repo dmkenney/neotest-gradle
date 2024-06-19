@@ -46,7 +46,11 @@ local function find_position_for_test_case(tree, test_case_node)
   local package_and_class = (test_case_node._attr.classname:gsub('%$', '%.'))
 
   for _, position in tree:iter() do
-    if position.name == function_name and vim.startswith(position.id, package_and_class) then
+    if
+      position.handle_name
+      and position.handle_name == function_name
+      and vim.startswith(position.id, package_and_class)
+    then
       return position
     end
   end
@@ -64,16 +68,20 @@ local function parse_error_from_failure_xml(failure_node, position)
   local message = (failure_node._attr.message:gsub(type .. '.*\n', ''))
 
   local stack_trace = failure_node[1] or ''
-  local package_name = get_package_name(position.path)
   local line_number
 
-  for _, line in ipairs(vim.split(stack_trace, '[\r]?\n')) do
-    local pattern = '^.*at.+' .. package_name .. '.*%(.+..+:(%d+)%)$'
-    local match = line:match(pattern)
+  --- The position.path could be a directory or a file. If a directory don't bother with the rest.
+  if position.path:match('%.java$') then
+    local package_name = get_package_name(position.path)
 
-    if match then
-      line_number = tonumber(match) - 1
-      break
+    for _, line in ipairs(vim.split(stack_trace, '[\r]?\n')) do
+      local pattern = '^.*at.+' .. package_name .. '.*%(.+..+:(%d+)%)$'
+      local match = line:match(pattern)
+
+      if match then
+        line_number = tonumber(match) - 1
+        break
+      end
     end
   end
 
@@ -94,8 +102,14 @@ end
 return function(build_specfication, _, tree)
   local results = {}
   local position = tree:data()
-  local results_directory = build_specfication.context.test_resuls_directory
+  local results_directory = build_specfication.context.test_results_directory
   local juris_reports = parse_xml_files_from_directory(results_directory)
+
+  local status_counts = {
+    passed = 0,
+    failed = 0,
+    skipped = 0,
+  }
 
   for _, juris_report in pairs(juris_reports) do
     for _, test_suite_node in pairs(asList(juris_report.testsuite)) do
@@ -104,17 +118,35 @@ return function(build_specfication, _, tree)
 
         if matched_position ~= nil then
           local failure_node = test_case_node.failure
-          local status = failure_node == nil and STATUS_PASSED or STATUS_FAILED
+          local status
+
+          if failure_node == nil then
+            status = STATUS_PASSED
+            status_counts.passed = status_counts.passed + 1
+          else
+            status = STATUS_FAILED
+            status_counts.failed = status_counts.failed + 1
+          end
+
           local short_message = (failure_node or {}).message
           local error = failure_node and parse_error_from_failure_xml(failure_node, position)
           local result = { status = status, short = short_message, errors = { error } }
           results[matched_position.id] = result
         end
-
-        -- TODO: What to do here?
       end
     end
   end
+
+  -- Notify the user with the summary of test results
+  local summary_message = string.format(
+    'Test Results: %d passed, %d failed, %d skipped',
+    status_counts.passed,
+    status_counts.failed,
+    status_counts.skipped
+  )
+  local log_level = status_counts.failed > 0 and vim.log.levels.ERROR or vim.log.levels.INFO
+
+  vim.notify(summary_message, log_level)
 
   return results
 end

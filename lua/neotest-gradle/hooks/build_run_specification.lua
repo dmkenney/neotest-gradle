@@ -1,7 +1,7 @@
 local lib = require('neotest.lib')
 local find_project_directory = require('neotest-gradle.hooks.find_project_directory')
 
---- Fiends either an executable file named `gradlew` in any parent directory of
+--- Finds either an executable file named `gradlew` in any parent directory of
 --- the project or falls back to a binary called `gradle` that must be available
 --- in the users PATH.
 ---
@@ -19,15 +19,15 @@ local function get_gradle_executable(project_directory)
 end
 
 --- Runs the given Gradle executable in the respective project directory to
---- query the `testResultsDir` property. Has to do so some plain text parsing of
+--- query the `testResultsDir` property. Has to do some plain text parsing of
 --- the Gradle command output. The child folder named `test` is always added to
 --- this path.
---- Is empty is directory could not be determined.
+--- Is empty if directory could not be determined.
 ---
 --- @param gradle_executable string
 --- @param project_directory string
 --- @return string - absolute path of test results directory
-local function get_test_results_directory(gradle_executable, project_directory)
+local function get_test_results_directory(gradle_executable, project_directory, gradle_task)
   local command = {
     gradle_executable,
     '--project-dir',
@@ -41,14 +41,14 @@ local function get_test_results_directory(gradle_executable, project_directory)
 
   for _, line in pairs(output_lines) do
     if line:match('testResultsDir: ') then
-      return line:gsub('testResultsDir: ', '') .. lib.files.sep .. 'test'
+      return line:gsub('testResultsDir: ', '') .. lib.files.sep .. gradle_task
     end
   end
 
   return ''
 end
 
---- Takes a NeoTest tree object and iterate over its positions. For each position
+--- Takes a NeoTest tree object and iterates over its positions. For each position
 --- it traverses up the tree to find the respective namespace that can be
 --- used to filter the tests on execution. The namespace is usually the parent
 --- test class.
@@ -96,11 +96,28 @@ local function get_test_filter_arguments(tree, position)
   return arguments
 end
 
+--- Determines the appropriate Gradle task based on the file path.
+--- If the file path contains `src/test`, it uses `test`.
+--- If the file path contains `src/integrationTest`, it uses `integrationTest`.
+---
+--- @param file_path string
+--- @return string - the Gradle task to use
+local function get_gradle_task(file_path)
+  if file_path:match('src' .. lib.files.sep .. 'test') then
+    return 'test'
+  elseif file_path:match('src' .. lib.files.sep .. 'integrationTest') then
+    return 'integrationTest'
+  else
+    -- Default to 'test' if neither condition is met
+    return 'test'
+  end
+end
+
 --- See Neotest adapter specification.
 ---
 --- In its core, it builds a command to start Gradle correctly in the project
 --- directory with a test filter based on the positions.
---- It also determines the folder where the resulsts will be reported to, to
+--- It also determines the folder where the results will be reported to, to
 --- collect them later on. That folder path is saved to the context object.
 ---
 --- @param arguments table - see neotest.RunArgs
@@ -109,11 +126,16 @@ return function(arguments)
   local position = arguments.tree:data()
   local project_directory = find_project_directory(position.path)
   local gradle_executable = get_gradle_executable(project_directory)
-  local command = { gradle_executable, '--project-dir', project_directory, 'test' }
+
+  -- Determine the correct Gradle task based on the file path
+  local gradle_task = get_gradle_task(position.path)
+
+  local command = { gradle_executable, '--project-dir', project_directory, gradle_task }
   vim.list_extend(command, get_test_filter_arguments(arguments.tree, position))
 
   local context = {}
-  context.test_resuls_directory = get_test_results_directory(gradle_executable, project_directory)
+  context.test_results_directory =
+    get_test_results_directory(gradle_executable, project_directory, gradle_task)
 
   return { command = table.concat(command, ' '), context = context }
 end
