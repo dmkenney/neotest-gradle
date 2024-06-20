@@ -70,12 +70,11 @@ local function parse_error_from_failure_xml(failure_node, position)
   local stack_trace = failure_node[1] or ''
   local line_number
 
-  --- The position.path could be a directory or a file. If a directory don't bother with the rest.
+  --- The position.path could be a directory or a file. If a directory don't bother with the
+  --- rest as it will throw an error.
   if position.path:match('%.java$') then
-    local package_name = get_package_name(position.path)
-
     for _, line in ipairs(vim.split(stack_trace, '[\r]?\n')) do
-      local pattern = '^.*at.+' .. package_name .. '.*%(.+..+:(%d+)%)$'
+      local pattern = '^.*at.+' .. position.id .. '.*%(.+..+:(%d+)%)$'
       local match = line:match(pattern)
 
       if match then
