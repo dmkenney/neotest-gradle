@@ -139,25 +139,30 @@ return function(arguments)
 
   if arguments.strategy == 'dap' then
     print('INYA DAP')
-    -- Add DAP specific configuration
     table.insert(command, '--debug-jvm')
-    -- context.strategy = 'dap'
+    context.strategy = 'dap'
 
     return {
-      -- command = table.concat(command, ' '),
-      -- command = 'echo $PWD',
+      command = table.concat(command, ' '),
       context = context,
       strategy = {
         type = 'java',
-        name = 'Debug test',
-        request = 'launch',
-        -- command = table.concat(command, ' '),
-        -- stopOnEntry = true,
-        -- request = 'attach',
+        name = 'Debug (Attach) - Local',
+        request = 'attach',
+        hostName = '127.0.0.1',
+        port = 5005,
+        -- program = 'sleep 10 && jdb',
+        -- timeout = 10000,
+        -- delay = 10000,
+        -- retry = 5,
+        -- program = 'jdb',
+        -- request = 'launch',
+        -- program = 'jdb -attach 5005',
         -- program = table.concat(command, ' '),
+        stopOnentry = true,
+        -- mode = 'test',
         -- port = 5005,
         -- console = 'integratedTerminal',
-        -- context = context,
       },
     }
   else
