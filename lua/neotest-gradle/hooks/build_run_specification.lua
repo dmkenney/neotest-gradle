@@ -151,18 +151,7 @@ return function(arguments)
         request = 'attach',
         hostName = '127.0.0.1',
         port = 5005,
-        -- program = 'sleep 10 && jdb',
-        -- timeout = 10000,
         -- delay = 10000,
-        -- retry = 5,
-        -- program = 'jdb',
-        -- request = 'launch',
-        -- program = 'jdb -attach 5005',
-        -- program = table.concat(command, ' '),
-        stopOnentry = true,
-        -- mode = 'test',
-        -- port = 5005,
-        -- console = 'integratedTerminal',
       },
     }
   else
