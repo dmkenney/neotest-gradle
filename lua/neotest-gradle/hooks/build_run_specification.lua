@@ -137,5 +137,30 @@ return function(arguments)
   context.test_results_directory =
     get_test_results_directory(gradle_executable, project_directory, gradle_task)
 
-  return { command = table.concat(command, ' '), context = context }
+  if arguments.strategy == 'dap' then
+    print('INYA DAP')
+    -- Add DAP specific configuration
+    table.insert(command, '--debug-jvm')
+    -- context.strategy = 'dap'
+
+    return {
+      -- command = table.concat(command, ' '),
+      -- command = 'echo $PWD',
+      context = context,
+      strategy = {
+        type = 'java',
+        name = 'Debug test',
+        request = 'launch',
+        -- command = table.concat(command, ' '),
+        -- stopOnEntry = true,
+        -- request = 'attach',
+        -- program = table.concat(command, ' '),
+        -- port = 5005,
+        -- console = 'integratedTerminal',
+        -- context = context,
+      },
+    }
+  else
+    return { command = table.concat(command, ' '), context = context }
+  end
 end
